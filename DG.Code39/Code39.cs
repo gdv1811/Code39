@@ -17,6 +17,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 using System.Text;
+using DG.Code39.StateMachine;
 
 namespace DG.Code39
 {
@@ -88,7 +89,7 @@ namespace DG.Code39
 
             foreach (var c in text)
             {
-                if (c == _startStopTag || !_charMap.TryGetCode(c, out var code))
+                if (c == _startStopTag || !_charMap.TryGetCode(char.ToUpper(c), out var code))
                     throw new Code39Exception($"This character cannot be encoded: '{c}'.");
                 builder.Append(code);
                 builder.Append(_space);
@@ -109,20 +110,9 @@ namespace DG.Code39
 
             var startStopCode = _charMap.GetCode(_startStopTag);
             var reader = new Code39CharCodeReader(barcode);
-
-            var code = reader.ReadNextCharCode();
-            if (code == startStopCode)
-                return DecodeDirectBarcode(reader, barcode.Length);
-
-            // try to read reverse barcode
-            return DecodeRevertBarcode(reader, startStopCode, barcode.Length);
-        }
-
-        private string DecodeDirectBarcode(Code39CharCodeReader reader, int barcodeLength)
-        {
+            reader.FindStartStopTag(startStopCode, Reverse(startStopCode));
             var builder = new StringBuilder();
-
-            while (reader.Position < barcodeLength)
+            while (true)
             {
                 var code = reader.ReadNextCharCode();
                 if (!_charMap.TryGetChar(code, out var ch))
@@ -133,31 +123,13 @@ namespace DG.Code39
 
                 builder.Append(ch);
             }
-            throw new Code39Exception($"Expected '{_startStopTag}' in the end of the barcode.");
         }
 
-        private string DecodeRevertBarcode(Code39CharCodeReader reader, string startStopCode, int barcodeLength)
+        internal static string Reverse(string s)
         {
-            var builder = new StringBuilder();
-
-            // set position to the end
-            reader.Position = barcodeLength - 1;
-            var code = reader.ReadNextRevertCharCode();
-            if (code != startStopCode)
-                throw new Code39Exception($"Expected '{_startStopTag}' in the beginning of the barcode.");
-
-            while (reader.Position > 0)
-            {
-                code = reader.ReadNextRevertCharCode();
-                if (!_charMap.TryGetChar(code, out var ch))
-                    throw new Code39Exception($"This charcode cannot be decoded: '{code}'.");
-
-                if (ch == _startStopTag)
-                    return builder.ToString();
-
-                builder.Append(ch);
-            }
-            throw new Code39Exception($"Expected '{_startStopTag}' in the end of the barcode.");
+            var charArray = s.ToCharArray();
+            Array.Reverse(charArray);
+            return new string(charArray);
         }
     }
 }
